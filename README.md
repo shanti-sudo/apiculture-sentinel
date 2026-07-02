@@ -114,6 +114,9 @@ agents-cli playground
 |---------|-------------|
 | **Schema-driven state machine** | `telemetry_schema.json` defines all hive states, signal thresholds, and persistence requirements — no hard-coded logic |
 | **Temporal persistence reasoning** | `SentinelMemory` tracks in-session observations; states like `PEST_DISTRESS_VARROA` require 24 h of signal persistence before triggering |
+| **First-run calibration** | First telemetry cycles with empty history return `INITIALIZING_MONITORING` to establish a baseline, bypassing default-to-healthy bias |
+| **Confidence-based scaling** | Score scales dynamically using temporal history length (+0.2 for >6 h) and SQLite keeper feedback history (penalty for low rating, boost for perfect rating) |
+| **Extreme event overrides** | Sudden weight drops (>5 kg) override initial calibration/persistence to trigger high-priority alerts immediately |
 | **MCP weather integration** | Environmental context is fetched from a local MCP server and injected into each evaluation |
 | **Pub/Sub alerting** | Critical and warning states are published to Google Cloud Pub/Sub for downstream notification pipelines |
 | **SQLite persistence** | All evaluations are written to `fleet.db` (`hive_fleet` + `diagnostic_events` tables) |
@@ -126,6 +129,7 @@ agents-cli playground
 
 | State | Severity | Description |
 |-------|----------|-------------|
+| `INITIALIZING_MONITORING` | INFO | Initial calibration state when no prior history is established |
 | `NORMAL_HEALTHY` | LOW | Nominal acoustic and thermal readings |
 | `COLD_STRESS_ALERT` | HIGH | Internal temp 20–31.9 °C |
 | `HEAT_STRESS_ALERT` | HIGH | Internal temp 37–39.9 °C |
