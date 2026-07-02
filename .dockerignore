@@ -1,0 +1,19 @@
+# Exclude specifications and local config directories
+specs/
+.gemini/
+
+# Exclude local testing, development, and system files
+tests/
+.git/
+.gitignore
+.github/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+simulated_data/weather_state.json

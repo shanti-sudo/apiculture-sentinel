@@ -1,0 +1,8 @@
+{
+  "brood_temperature_c": {
+    "normal": "32-36",
+    "warning_low": "<31",
+    "warning_high": ">37",
+    "critical": ">39"
+  }
+}

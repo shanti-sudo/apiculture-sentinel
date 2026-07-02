@@ -1,0 +1,177 @@
+{
+    "state_definitions": {
+        "CATASTROPHIC_MASS_LOSS": {
+            "required_signals": [
+                {
+                    "id": "weight_delta_1h",
+                    "type": "range",
+                    "value": [
+                        -100.0,
+                        -5.1
+                    ]
+                }
+            ],
+            "supporting_signals": [
+                {
+                    "id": "edge_acoustic_classification",
+                    "type": "match",
+                    "value": "ERRATIC_MITE_STRESS"
+                }
+            ],
+            "persistence_requirement": 0,
+            "severity": "CRITICAL",
+            "confidence_override": 0.75,
+            "description": "Massive, non-biological weight loss indicating theft, predator interference, or hardware failure. Immediate inspection required."
+        },
+        "SWARM_DEPARTURE_DETECTED": {
+            "required_signals": [
+                {
+                    "id": "weight_delta_1h",
+                    "type": "range",
+                    "value": [
+                        -5.0,
+                        -1.5
+                    ]
+                },
+                {
+                    "id": "edge_acoustic_classification",
+                    "type": "match",
+                    "value": "QUIESCENT"
+                }
+            ],
+            "persistence_requirement": 6,
+            "severity": "CRITICAL",
+            "confidence_override": null
+        },
+        "PRE_SWARMING_ALERT": {
+            "required_signals": [
+                {
+                    "id": "edge_acoustic_classification",
+                    "type": "match",
+                    "value": "PIPING_DETECTED"
+                }
+            ],
+            "supporting_signals": [
+                {
+                    "id": "weight_trend",
+                    "type": "match",
+                    "value": "decreasing"
+                }
+            ],
+            "persistence_requirement": 4,
+            "severity": "HIGH",
+            "confidence_override": null
+        },
+        "QUEENLESS_COLONY": {
+            "required_signals": [
+                {
+                    "id": "edge_acoustic_classification",
+                    "type": "match",
+                    "value": "MOURNING_ROAR"
+                }
+            ],
+            "supporting_signals": [
+                {
+                    "id": "internal_temp_c",
+                    "type": "range",
+                    "value": [
+                        33,
+                        35
+                    ]
+                }
+            ],
+            "persistence_requirement": 12,
+            "severity": "CRITICAL",
+            "confidence_override": null
+        },
+        "COLD_STRESS_ALERT": {
+            "required_signals": [
+                {
+                    "id": "internal_temp_c",
+                    "type": "range",
+                    "value": [
+                        20,
+                        31.9
+                    ]
+                }
+            ],
+            "persistence_requirement": 2,
+            "severity": "HIGH",
+            "confidence_override": null
+        },
+        "PEST_DISTRESS_VARROA": {
+            "required_signals": [
+                {
+                    "id": "edge_acoustic_classification",
+                    "type": "match",
+                    "value": "ERRATIC_MITE_STRESS"
+                },
+                {
+                    "id": "internal_temp_c",
+                    "type": "range",
+                    "value": [
+                        33,
+                        35.5
+                    ]
+                }
+            ],
+            "persistence_requirement": 24,
+            "severity": "MEDIUM",
+            "confidence_override": null
+        },
+        "HEAT_STRESS_ALERT": {
+            "required_signals": [
+                {
+                    "id": "internal_temp_c",
+                    "type": "range",
+                    "value": [
+                        37,
+                        39.9
+                    ]
+                }
+            ],
+            "persistence_requirement": 2,
+            "severity": "HIGH",
+            "confidence_override": null
+        },
+        "CRITICAL_HEAT_ALERT": {
+            "required_signals": [
+                {
+                    "id": "internal_temp_c",
+                    "type": "range",
+                    "value": [
+                        40,
+                        50
+                    ]
+                }
+            ],
+            "persistence_requirement": 1,
+            "severity": "CRITICAL",
+            "confidence_override": null
+        },
+        "NORMAL_HEALTHY": {
+            "required_signals": [
+                {
+                    "id": "internal_temp_c",
+                    "type": "range",
+                    "value": [
+                        32,
+                        36
+                    ]
+                },
+                {
+                    "id": "edge_acoustic_classification",
+                    "type": "match",
+                    "value": "STEADY_HUM"
+                }
+            ],
+            "persistence_requirement": 0,
+            "severity": "LOW",
+            "confidence_override": 0.75
+        }
+    },
+    "event_resolution": {
+        "min_confidence_threshold": 0.75,
+        "required_signal_matching": true
+    }
+}
