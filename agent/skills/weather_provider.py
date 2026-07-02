@@ -57,12 +57,23 @@ class MCPWeatherProvider(WeatherProvider):
         Returns:
             dict: Merged or retrieved weather metrics with safe defaults.
         """
+        # Load fallback directly from source JSON to avoid hardcoded values
+        source_json_path = Path(__file__).parent.parent.parent / "simulated_data" / "weather_state.json"
         fallback_weather = {
             "external_temp_c": 20.0,
             "conditions": "Sunny",
             "humidity": 50.0,
             "wind_speed_kmh": 10.0
         }
+        if source_json_path.exists():
+            try:
+                import json as json_lib
+                with open(source_json_path, encoding="utf-8") as f:
+                    data = json_lib.load(f)
+                    for k, v in data.items():
+                        fallback_weather[k] = v
+            except Exception as e:
+                logger.error(f"Failed to read source weather_state.json: {e}")
 
         # Case 1: Reusable active client session is provided (e.g., during live app operations or tests)
         if self.mcp_client is not None:

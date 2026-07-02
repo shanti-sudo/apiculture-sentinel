@@ -94,16 +94,31 @@ def ensure_mcp_initialized(server_path: Path):
 async def get_mcp_environmental_context() -> dict:
     """
     Fetches the current simulated weather context via the persistent MCP session.
-    Falls back to safe-state defaults on any failure.
+    Falls back to the source JSON file on any failure to avoid hardcoding defaults.
     """
     import streamlit as st
+    from pathlib import Path
+    
+    # Resolve project root and locate source JSON file
+    project_root = Path(__file__).parent.parent
+    source_json_path = project_root / "simulated_data" / "weather_state.json"
+    
     _fallback = {
-        "internal_temp_c": 35.0,
         "external_temp_c": 20.0,
         "conditions": "Sunny",
         "humidity": 50.0,
         "wind_speed_kmh": 10.0,
     }
+    
+    if source_json_path.exists():
+        try:
+            with open(source_json_path, encoding="utf-8") as f:
+                data = json.load(f)
+                for k, v in data.items():
+                    _fallback[k] = v
+        except Exception as e:
+            logger.error(f"Failed to read source weather_state.json fallback: {e}")
+            
     try:
         manager = st.session_state.get("mcp_manager")
         if not manager or not manager.session:
@@ -121,7 +136,7 @@ async def get_mcp_environmental_context() -> dict:
                 import ast
                 return ast.literal_eval(content_text)
     except Exception as e:
-        logger.warning(f"Failed to get MCP environmental context: {e}. Using safe-state fallback.")
+        logger.warning(f"Failed to get MCP environmental context: {e}. Using source weather_state.json fallback.")
     return _fallback
 
 

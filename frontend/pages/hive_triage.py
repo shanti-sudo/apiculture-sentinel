@@ -25,6 +25,17 @@ from frontend.mcp_client import (
 
 logger = logging.getLogger(__name__)
 
+# Centralized fallback defaults configuration
+DEFAULT_HIVE_STATE = {
+    "internal_temp_c": 35.0,
+    "hive_weight_kg": 50.0,
+    "edge_acoustic_classification": "STEADY_HUM",
+    "external_temp_c": 25.0,
+    "conditions": "Partly Cloudy",
+    "humidity": 50.0,
+    "wind_speed_kmh": 10.0
+}
+
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Node Triage · Apiculture Sentinel",
@@ -69,26 +80,40 @@ from frontend.database import get_hive_telemetry
 fleet_hive_data = get_hive_telemetry(fleet_hive_id)
 
 # Only stamp session state from database on first-time load of this hive
-if st.session_state.get("loaded_hive_id") != fleet_hive_id and fleet_hive_data:
-    acoustic_val = fleet_hive_data.get("edge_acoustic_classification", "STEADY_HUM")
-    if acoustic_val not in ["STEADY_HUM", "PIPING_DETECTED", "ERRATIC_MITE_STRESS", "MOURNING_ROAR", "QUIESCENT"]:
+if st.session_state.get("loaded_hive_id") != fleet_hive_id:
+    if not isinstance(fleet_hive_data, dict):
+        fleet_hive_data = {}
+    acoustic_val = fleet_hive_data.get("edge_acoustic_classification")
+    if acoustic_val == "NORMAL":
         acoustic_val = "STEADY_HUM"
+    if acoustic_val not in ["STEADY_HUM", "PIPING_DETECTED", "ERRATIC_MITE_STRESS", "MOURNING_ROAR", "QUIESCENT"]:
+        acoustic_val = DEFAULT_HIVE_STATE["edge_acoustic_classification"]
     st.session_state["edge_acoustic_classification"] = acoustic_val
-    st.session_state["int_temp"] = float(fleet_hive_data.get("internal_temp_c", 35.0))
-    st.session_state["ext_temp"] = float(fleet_hive_data.get("external_temp_c", 20.0))
-    st.session_state["weight"]   = float(fleet_hive_data.get("hive_weight_kg", 40.0))
-    st.session_state["weather_conditions"] = "Partly Cloudy"
+    st.session_state["int_temp"] = float(fleet_hive_data.get("internal_temp_c") if fleet_hive_data.get("internal_temp_c") is not None else DEFAULT_HIVE_STATE["internal_temp_c"])
+    st.session_state["ext_temp"] = float(fleet_hive_data.get("external_temp_c") if fleet_hive_data.get("external_temp_c") is not None else DEFAULT_HIVE_STATE["external_temp_c"])
+    st.session_state["weight"]   = float(fleet_hive_data.get("hive_weight_kg") if fleet_hive_data.get("hive_weight_kg") is not None else DEFAULT_HIVE_STATE["hive_weight_kg"])
+    st.session_state["weather_conditions"] = fleet_hive_data.get("conditions") if fleet_hive_data.get("conditions") is not None else DEFAULT_HIVE_STATE["conditions"]
 
     # Automatically write this hive's initial state to the MCP weather simulation file
     WEATHER_STATE_FILE = Path(project_root) / "simulated_data" / "weather_state.json"
     try:
         WEATHER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        humidity = 50.0
+        wind_speed_kmh = 10.0
+        if WEATHER_STATE_FILE.exists():
+            try:
+                with open(WEATHER_STATE_FILE, "r", encoding="utf-8") as rf:
+                    existing = json.load(rf)
+                    humidity = existing.get("humidity", 50.0)
+                    wind_speed_kmh = existing.get("wind_speed_kmh", 10.0)
+            except Exception:
+                pass
         with open(WEATHER_STATE_FILE, "w", encoding="utf-8") as f:
             json.dump({
                 "external_temp_c": st.session_state["ext_temp"],
                 "conditions": st.session_state["weather_conditions"],
-                "humidity": 50,
-                "wind_speed_kmh": 10.0
+                "humidity": humidity,
+                "wind_speed_kmh": wind_speed_kmh
             }, f, indent=4)
     except Exception as e:
         logger.error(f"Failed to initialize weather state file: {e}")
@@ -345,12 +370,22 @@ WEATHER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
 if st.sidebar.button("Update MCP Context"):
     st.session_state.mcp_dirty = False
     try:
+        humidity = 50.0
+        wind_speed_kmh = 10.0
+        if WEATHER_STATE_FILE.exists():
+            try:
+                with open(WEATHER_STATE_FILE, "r", encoding="utf-8") as rf:
+                    existing = json.load(rf)
+                    humidity = existing.get("humidity", 50.0)
+                    wind_speed_kmh = existing.get("wind_speed_kmh", 10.0)
+            except Exception:
+                pass
         with open(WEATHER_STATE_FILE, "w", encoding="utf-8") as f:
             json.dump({
                 "external_temp_c": ext_temp,
                 "conditions": weather_conditions,
-                "humidity": 50,
-                "wind_speed_kmh": 10.0
+                "humidity": humidity,
+                "wind_speed_kmh": wind_speed_kmh
             }, f, indent=4)
         st.sidebar.success("MCP State Updated!")
         st.rerun()
@@ -368,19 +403,38 @@ with col1:
         if not manager or not manager.session or manager.error:
             st.warning("⚠️ MCP Weather Server unavailable. Using safe-state fallback values.")
     except Exception as e:
-        current_mcp_context = {
-            "internal_temp_c": 35.0, "external_temp_c": 20.0,
-            "conditions": "Sunny (Fallback)", "humidity": 50.0, "wind_speed_kmh": 10.0,
-        }
+        fallback_ext_temp = DEFAULT_HIVE_STATE["external_temp_c"]
+        fallback_conditions = DEFAULT_HIVE_STATE["conditions"]
+        loaded_from_file = False
+        try:
+            with open(WEATHER_STATE_FILE, "r", encoding="utf-8") as rf:
+                current_mcp_context = json.load(rf)
+                if current_mcp_context.get("external_temp_c") is not None:
+                    loaded_from_file = True
+        except Exception:
+            pass
+            
+        if not loaded_from_file:
+            current_mcp_context = {
+                "external_temp_c": fallback_ext_temp,
+                "conditions": fallback_conditions,
+                "humidity": DEFAULT_HIVE_STATE["humidity"],
+                "wind_speed_kmh": DEFAULT_HIVE_STATE["wind_speed_kmh"],
+            }
+            try:
+                with open(WEATHER_STATE_FILE, "w", encoding="utf-8") as wf:
+                    json.dump(current_mcp_context, wf, indent=4)
+            except Exception as write_err:
+                logger.error(f"Failed to write fallback weather state: {write_err}")
         st.warning(f"⚠️ Could not fetch MCP context: {e}")
 
     m1, m2 = st.columns(2)
-    m1.metric("Internal Temp (°C)", f"{current_mcp_context.get('internal_temp_c', 35.0)} °C")
-    m2.metric("External Temp (°C)", f"{current_mcp_context.get('external_temp_c', 20.0)} °C")
+    m1.metric("Internal Temp (°C)", f"{int_temp} °C")
+    m2.metric("External Temp (°C)", f"{current_mcp_context.get('external_temp_c')} °C")
     st.info(
-        f"**MCP Weather Context**: {current_mcp_context.get('conditions', 'Sunny')}, "
-        f"Humidity: {current_mcp_context.get('humidity', 50)}%, "
-        f"Wind: {current_mcp_context.get('wind_speed_kmh', 10)} km/h"
+        f"**MCP Weather Context**: {current_mcp_context.get('conditions')}, "
+        f"Humidity: {current_mcp_context.get('humidity')}%, "
+        f"Wind: {current_mcp_context.get('wind_speed_kmh')} km/h"
     )
 
     st.markdown("---")
@@ -391,8 +445,8 @@ with col1:
         "edge_acoustic_classification": edge_acoustic_classification,
         "acoustic_metrics": {"edge_acoustic_classification": edge_acoustic_classification},
         "environmental_metrics": {
-            "internal_temp_c": current_mcp_context.get("internal_temp_c", 35.0),
-            "external_temp_c": current_mcp_context.get("external_temp_c", 20.0),
+            "internal_temp_c": int_temp,
+            "external_temp_c": current_mcp_context.get("external_temp_c"),
         },
         "weight_metrics": {"hive_weight_kg": weight},
     }

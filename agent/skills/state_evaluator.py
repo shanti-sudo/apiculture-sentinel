@@ -195,9 +195,33 @@ async def evaluate_hive_state(
         edge_acoustic_classification = find_value_in_dict(telemetry_data, "edge_acoustic_classification") or "STEADY_HUM"
 
         # Decouple: internal temp belongs strictly to local hive telemetry
-        int_temp = environment.get("internal_temp_c", 35.0)
-        # External temp belongs strictly to MCP weather context (with fallback to payload)
-        ext_temp = mcp_weather.get("external_temp_c", environment.get("external_temp_c", 20.0))
+        default_int_temp = 35.0
+        thresholds_path = Path(__file__).parent.parent.parent / "simulated_data" / "temperature_thresholds.json"
+        if thresholds_path.exists():
+            try:
+                import json as json_lib
+                with open(thresholds_path, encoding="utf-8") as tf:
+                    t_data = json_lib.load(tf)
+                    normal_range = t_data.get("brood_temperature_c", {}).get("normal", "32-36")
+                    parts = normal_range.split("-")
+                    default_int_temp = (float(parts[0]) + float(parts[1])) / 2.0
+            except Exception:
+                pass
+        int_temp = environment.get("internal_temp_c", default_int_temp)
+
+        # Load external temp fallback directly from the source weather_state.json
+        source_json_path = Path(__file__).parent.parent.parent / "simulated_data" / "weather_state.json"
+        source_ext_temp = 20.0
+        if source_json_path.exists():
+            try:
+                import json as json_lib
+                with open(source_json_path, encoding="utf-8") as f:
+                    source_ext_temp = float(json_lib.load(f).get("external_temp_c", 20.0))
+            except Exception:
+                pass
+
+        # External temp belongs strictly to MCP weather context (with fallback to payload/source JSON)
+        ext_temp = mcp_weather.get("external_temp_c", environment.get("external_temp_c", source_ext_temp))
         weight = telemetry_data.get("weight_metrics", {}).get("hive_weight_kg", 40.0)
 
         # Calculate weight_delta_1h based on most recent historical weight in SentinelMemory
