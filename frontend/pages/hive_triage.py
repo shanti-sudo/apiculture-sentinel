@@ -94,6 +94,26 @@ if st.session_state.get("loaded_hive_id") != fleet_hive_id and fleet_hive_data:
     except Exception as e:
         logger.error(f"Failed to initialize weather state file: {e}")
 
+    # Seed SentinelMemory with current telemetry state from database as initial baseline observation
+    from agent.skills.sentinel_memory import SentinelMemory
+    mem = SentinelMemory()
+    last_state = fleet_hive_data.get("state", "INITIALIZING_MONITORING")
+    mem.observations.append({
+        "timestamp": fleet_hive_data.get("last_eval_ts") or datetime.datetime.now().isoformat(),
+        "state": last_state,
+        "explanation": "Loaded baseline from database",
+        "telemetry": {
+            "edge_acoustic_classification": acoustic_val,
+            "environmental_metrics": {
+                "internal_temp_c": st.session_state["int_temp"]
+            },
+            "weight_metrics": {
+                "hive_weight_kg": st.session_state["weight"]
+            }
+        }
+    })
+    st.session_state.sentinel_memory = mem
+
     st.session_state["mcp_dirty"] = False
     st.session_state["loaded_hive_id"] = fleet_hive_id
     if "evaluation_result" in st.session_state:
@@ -436,7 +456,8 @@ with col1:
                 log_diagnostic_event(
                     hive_id=fleet_hive_id,
                     evaluation_result=result,
-                    message_id=pubsub_msg_id
+                    message_id=pubsub_msg_id,
+                    telemetry_data=telemetry_data
                 )
 
                 st.session_state["evaluation_result"] = result
@@ -510,48 +531,12 @@ with col1:
         if "explanation" in result:
             st.info(f"🧠 **Agent Sentinel Explanation**:\n\n{result['explanation']}")
 
-        # Check if the evaluated state is NORMAL_HEALTHY but the loaded database state was an anomaly/critical
-        loaded_state = fleet_hive_data.get("state", "NORMAL_HEALTHY")
-        if result["state"] == "NORMAL_HEALTHY":
-            if loaded_state != "NORMAL_HEALTHY":
-                if loaded_state == "SWARM_DEPARTURE_DETECTED":
-                    st.info(
-                        f"💡 **Beekeeper Note:** This hive was loaded from Fleet Command with state **{loaded_state}**, "
-                        "but it evaluated as **NORMAL_HEALTHY** because:\n\n"
-                        "1. **Empty Sentinel Memory (0.0 kg Delta):** Calculating a weight drop requires a previous weight in memory. "
-                        "On a fresh evaluation, the delta is evaluated as `0.0 kg` (reverting to normal).\n"
-                        "2. **6-Hour Temporal Persistence Filter:** Swarm departure detection requires 6 hours of continuous "
-                        "matching telemetry history (quiescent acoustics & weight drop) in Sentinel Memory. Without this history, the state is rejected.\n\n"
-                        "**To simulate a swarm departure:**  \n"
-                        "1. Set the **Edge Audio Sensor** to `QUIESCENT` and **Hive Weight** to `45.0 kg`. Click **Evaluate Hive State** to record the baseline weight.  \n"
-                        "2. Lower the weight slider to `42.0 kg` (a `-3.0 kg` drop).  \n"
-                        "3. Check **Interactive Demo Mode (Bypass Temporal Persistence)** in the sidebar, then click **Evaluate Hive State** again."
-                    )
-                elif loaded_state == "CATASTROPHIC_MASS_LOSS":
-                    st.info(
-                        f"💡 **Beekeeper Note:** This hive was loaded from Fleet Command with state **{loaded_state}**, "
-                        "but it evaluated as **NORMAL_HEALTHY** because:\n\n"
-                        "* **Empty Sentinel Memory (0.0 kg Delta):** Calculating a catastrophic mass loss requires a previous weight in memory. "
-                        "On a fresh evaluation, the delta is evaluated as `0.0 kg` (reverting to normal).\n\n"
-                        "**To simulate catastrophic mass loss:**  \n"
-                        "1. Set the **Hive Weight** slider to a high value (e.g. `45.0 kg`) and click **Evaluate Hive State** to record the baseline weight.  \n"
-                        "2. Lower the weight slider below `40.0 kg` (e.g. `38.0 kg` for a > 5.0 kg sudden drop).  \n"
-                        "3. Click **Evaluate Hive State** again."
-                    )
-                else:
-                    st.info(
-                        f"💡 **Beekeeper Note:** This hive was loaded from Fleet Command with state **{loaded_state}**, "
-                        "but it evaluated as **NORMAL_HEALTHY** because the temporal persistence filters or signal matching rules "
-                        "failed on this fresh evaluation cycle. As a result, the agent fell back to the `NORMAL_HEALTHY` baseline."
-                    )
-            elif weight < 30.0:
-                st.info(
-                    "💡 **Beekeeper Note:** If you expected a *Catastrophic Mass Loss* alert for this hive's low weight, "
-                    "note that the agent requires a previous weight in Sentinel Memory to calculate a delta. "
-                    "Since memory was empty, the delta was evaluated as `0.0 kg` (reverting to normal). "
-                    "To simulate a weight drop: first evaluate the hive at a higher weight (e.g. 45 kg), "
-                    "then lower the weight slider and click **Evaluate Hive State** again."
-                )
+        # Check if the evaluated state is INITIALIZING_MONITORING or NORMAL_HEALTHY to show dynamic reason
+        if result["state"] in ("INITIALIZING_MONITORING", "NORMAL_HEALTHY"):
+            reason_text = result.get("reason") or result.get("explanation", "Operating within normal parameters.")
+            st.info(f"💡 **Beekeeper Note:** {reason_text}")
+
+
 
         if result["state"] in STATE_DETAILS:
             details = STATE_DETAILS[result["state"]]

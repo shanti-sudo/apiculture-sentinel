@@ -395,16 +395,30 @@ def get_all_sites() -> list:
     return [r[0] for r in rows]
 
 
-def log_diagnostic_event(hive_id: str, evaluation_result: dict, message_id: str = None):
+def log_diagnostic_event(hive_id: str, evaluation_result: dict, message_id: str = None, telemetry_data: dict = None):
     """
     Inserts the agent's final diagnostic decision into diagnostic_events
-    and updates the active state and last_eval_ts in hive_fleet.
+    and updates the active state, last_eval_ts, and telemetry readings in hive_fleet.
     """
     state = evaluation_result.get("state", "NORMAL_HEALTHY")
     severity = evaluation_result.get("severity", "INFO")
     action = evaluation_result.get("action", "Log normal status")
     confidence = float(evaluation_result.get("confidence", 1.0))
     ts = datetime.datetime.now().isoformat(timespec="seconds")
+
+    # Safe defaults
+    int_temp = 35.0
+    ext_temp = 20.0
+    weight = 40.0
+    acoustic = "STEADY_HUM"
+    weight_delta = 0.0
+
+    if telemetry_data:
+        int_temp = float(telemetry_data.get("environmental_metrics", {}).get("internal_temp_c", int_temp))
+        ext_temp = float(telemetry_data.get("environmental_metrics", {}).get("external_temp_c", ext_temp))
+        weight = float(telemetry_data.get("weight_metrics", {}).get("hive_weight_kg", weight))
+        acoustic = telemetry_data.get("edge_acoustic_classification", acoustic)
+        weight_delta = float(telemetry_data.get("weight_metrics", {}).get("weight_delta_1h", weight_delta))
 
     with _get_conn() as conn:
         conn.execute("""
@@ -414,9 +428,11 @@ def log_diagnostic_event(hive_id: str, evaluation_result: dict, message_id: str 
 
         conn.execute("""
             UPDATE hive_fleet
-            SET state = ?, severity = ?, action = ?, last_eval_ts = ?
+            SET state = ?, severity = ?, action = ?, last_eval_ts = ?,
+                internal_temp_c = ?, external_temp_c = ?, hive_weight_kg = ?,
+                edge_acoustic_classification = ?, weight_delta_1h = ?
             WHERE hive_id = ?
-        """, (state, severity, action, ts, hive_id))
+        """, (state, severity, action, ts, int_temp, ext_temp, weight, acoustic, weight_delta, hive_id))
 
 
 def get_active_alerts(severity_filter: list = None, site_filter: list = None):

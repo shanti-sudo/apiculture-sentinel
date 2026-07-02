@@ -218,6 +218,23 @@ async def evaluate_hive_state(
             telemetry_data["weight_metrics"] = {}
         telemetry_data["weight_metrics"]["weight_delta_1h"] = weight_delta_1h
 
+        # Determine if we have >6 hours of history
+        has_six_hours_history = False
+        if past_obs:
+            try:
+                oldest_time = None
+                for obs in past_obs:
+                    if "timestamp" in obs:
+                        t = datetime.datetime.fromisoformat(obs["timestamp"])
+                        if oldest_time is None or t < oldest_time:
+                            oldest_time = t
+                if oldest_time is not None:
+                    time_diff = datetime.datetime.now() - oldest_time
+                    if time_diff.total_seconds() > 6 * 3600:
+                        has_six_hours_history = True
+            except Exception as e:
+                logger.warning(f"Error calculating history length: {e}")
+
         # Spatial validation has been decoupled from the real-time node triage flow
         spatial_report = None
 
@@ -388,6 +405,16 @@ async def evaluate_hive_state(
             state_def = state_defs.get("NORMAL_HEALTHY", {})
             severity = "INFO"
             selected_confidence = state_confidences.get("NORMAL_HEALTHY", 1.0)
+
+        # If the evaluated state is NORMAL_HEALTHY but the previous state in memory was INITIALIZING_MONITORING,
+        # remain in INITIALIZING_MONITORING (building history) rather than instantly reverting.
+        if base_state == "NORMAL_HEALTHY":
+            previous_state = past_obs[-1].get("state") if past_obs else None
+            if previous_state == "INITIALIZING_MONITORING" and not has_six_hours_history:
+                base_state = "INITIALIZING_MONITORING"
+                state_def = {}
+                severity = "INFO"
+                selected_confidence = 0.5
 
         # Downgrade CRITICAL_HEAT_ALERT to HEAT_STRESS_ALERT if weather is not Sunny
         if base_state == "CRITICAL_HEAT_ALERT" and mcp_weather.get("conditions") != "Sunny":
@@ -561,22 +588,6 @@ async def evaluate_hive_state(
         # Confidence Scaling
         base_confidence = 0.5 if is_first_run else selected_confidence
         
-        has_six_hours_history = False
-        if past_obs:
-            try:
-                oldest_time = None
-                for obs in past_obs:
-                    if "timestamp" in obs:
-                        t = datetime.datetime.fromisoformat(obs["timestamp"])
-                        if oldest_time is None or t < oldest_time:
-                            oldest_time = t
-                if oldest_time is not None:
-                    time_diff = datetime.datetime.now() - oldest_time
-                    if time_diff.total_seconds() > 6 * 3600:
-                        has_six_hours_history = True
-            except Exception as e:
-                logger.warning(f"Error calculating history length: {e}")
-
         memory_multiplier = 0.2 if has_six_hours_history else 0.0
 
         feedback_bonus = 0.0
@@ -596,7 +607,8 @@ async def evaluate_hive_state(
             "action": action,
             "severity": severity,
             "explanation": explanation,
-            "confidence": final_confidence
+            "confidence": final_confidence,
+            "reason": reasoning_str
         }
 
         if memory is not None:

@@ -27,6 +27,7 @@ def seed_memory(memory: SentinelMemory):
             "weight_metrics": {"hive_weight_kg": 40.0}
         }
     )
+    memory.observations[-1]["timestamp"] = (datetime.datetime.now() - datetime.timedelta(hours=10)).isoformat()
 
 @pytest.mark.anyio
 async def test_first_run_initializing():
@@ -474,3 +475,30 @@ def test_spatial_clearance_violations():
     assert any("Front clearance" in r for r in violations_map["hive_2"])
     assert any("Rear clearance" in r for r in violations_map["hive_3"])
     assert any("Side clearance" in r for r in violations_map["hive_3"])
+
+
+@pytest.mark.anyio
+async def test_initializing_monitoring_fallback():
+    # If previous state was INITIALIZING_MONITORING and current telemetry is normal, it stays in INITIALIZING_MONITORING
+    payload = {
+        "edge_acoustic_classification": "STEADY_HUM",
+        "acoustic_metrics": {
+            "edge_acoustic_classification": "STEADY_HUM"
+        },
+        "environmental_metrics": {
+            "internal_temp_c": 35.0
+        },
+        "weight_metrics": {
+            "hive_weight_kg": 40.0
+        }
+    }
+    memory = SentinelMemory()
+    memory.add_observation(
+        state="INITIALIZING_MONITORING",
+        explanation="Establishing baseline",
+        telemetry=payload
+    )
+    wp = MockWeatherProvider()
+    result = await evaluate_hive_state(payload, weather_provider=wp, memory=memory)
+    assert result["state"] == "INITIALIZING_MONITORING"
+    assert "establishing baseline" in result["reason"].lower()
