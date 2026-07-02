@@ -40,7 +40,6 @@ def get_simulated_weather(location: str = "main_apiary") -> dict:
     # Default fallback weather state
     default_weather = {
         "location": location,
-        "internal_temp_c": 35.0,
         "external_temp_c": 20.0,
         "conditions": "Sunny",
         "humidity": 50.0,
@@ -57,7 +56,6 @@ def get_simulated_weather(location: str = "main_apiary") -> dict:
         # Merge values directly from the state JSON root, using defaults for anything missing
         weather_data = {
             "location": location,
-            "internal_temp_c": float(state.get("internal_temp_c", default_weather["internal_temp_c"])),
             "external_temp_c": float(state.get("external_temp_c", default_weather["external_temp_c"])),
             "conditions": str(state.get("conditions", default_weather["conditions"])),
             "humidity": float(state.get("humidity", default_weather["humidity"])),

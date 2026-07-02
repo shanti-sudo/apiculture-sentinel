@@ -85,7 +85,6 @@ if st.session_state.get("loaded_hive_id") != fleet_hive_id and fleet_hive_data:
         WEATHER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(WEATHER_STATE_FILE, "w", encoding="utf-8") as f:
             json.dump({
-                "internal_temp_c": st.session_state["int_temp"],
                 "external_temp_c": st.session_state["ext_temp"],
                 "conditions": st.session_state["weather_conditions"],
                 "humidity": 50,
@@ -347,8 +346,12 @@ if st.sidebar.button("Update MCP Context"):
     st.session_state.mcp_dirty = False
     try:
         with open(WEATHER_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump({"internal_temp_c": int_temp, "external_temp_c": ext_temp,
-                       "conditions": weather_conditions, "humidity": 50, "wind_speed_kmh": 10.0}, f, indent=4)
+            json.dump({
+                "external_temp_c": ext_temp,
+                "conditions": weather_conditions,
+                "humidity": 50,
+                "wind_speed_kmh": 10.0
+            }, f, indent=4)
         st.sidebar.success("MCP State Updated!")
         st.rerun()
     except Exception as e:

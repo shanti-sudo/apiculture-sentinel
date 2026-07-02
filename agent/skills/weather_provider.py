@@ -58,7 +58,6 @@ class MCPWeatherProvider(WeatherProvider):
             dict: Merged or retrieved weather metrics with safe defaults.
         """
         fallback_weather = {
-            "internal_temp_c": 35.0,
             "external_temp_c": 20.0,
             "conditions": "Sunny",
             "humidity": 50.0,

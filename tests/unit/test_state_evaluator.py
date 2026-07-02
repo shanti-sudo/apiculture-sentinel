@@ -10,7 +10,7 @@ class MockWeatherProvider(WeatherProvider):
     async def get_weather_context(self) -> dict:
         return {
             "internal_temp_c": 35.0,
-            "external_temp_c": 20.0,
+            "external_temp_c": 35.0,
             "conditions": "Sunny",
             "humidity": 50.0,
             "wind_speed_kmh": 10.0

@@ -194,8 +194,10 @@ async def evaluate_hive_state(
         # Extract metrics with safe defaults for explanations
         edge_acoustic_classification = find_value_in_dict(telemetry_data, "edge_acoustic_classification") or "STEADY_HUM"
 
-        int_temp = environment.get("internal_temp_c", mcp_weather.get("internal_temp_c", 35.0))
-        ext_temp = environment.get("external_temp_c", mcp_weather.get("external_temp_c", 20.0))
+        # Decouple: internal temp belongs strictly to local hive telemetry
+        int_temp = environment.get("internal_temp_c", 35.0)
+        # External temp belongs strictly to MCP weather context (with fallback to payload)
+        ext_temp = mcp_weather.get("external_temp_c", environment.get("external_temp_c", 20.0))
         weight = telemetry_data.get("weight_metrics", {}).get("hive_weight_kg", 40.0)
 
         # Calculate weight_delta_1h based on most recent historical weight in SentinelMemory
@@ -416,12 +418,18 @@ async def evaluate_hive_state(
                 severity = "INFO"
                 selected_confidence = 0.5
 
-        # Downgrade CRITICAL_HEAT_ALERT to HEAT_STRESS_ALERT if weather is not Sunny
-        if base_state == "CRITICAL_HEAT_ALERT" and mcp_weather.get("conditions") != "Sunny":
-            logger.info("Downgrading CRITICAL_HEAT_ALERT to HEAT_STRESS_ALERT because weather conditions are not Sunny")
-            base_state = "HEAT_STRESS_ALERT"
-            state_def = state_defs.get("HEAT_STRESS_ALERT", {})
-            severity = "HIGH"
+        # Solar Loading check: compare telemetry's internal_temp (int_temp) against the MCP's
+        # external weather context to detect CRITICAL_HEAT_EXPOSURE.
+        if base_state == "CRITICAL_HEAT_ALERT":
+            mcp_ext_temp = float(mcp_weather.get("external_temp_c", 20.0))
+            mcp_conditions = mcp_weather.get("conditions", "Sunny")
+            if mcp_conditions == "Sunny" and mcp_ext_temp >= 30.0:
+                logger.info("CRITICAL_HEAT_EXPOSURE detected: Solar loading active (Sunny & external temp >= 30.0C)")
+            else:
+                logger.info("Downgrading CRITICAL_HEAT_ALERT to HEAT_STRESS_ALERT: No solar loading (weather not Sunny or external temp < 30.0C)")
+                base_state = "HEAT_STRESS_ALERT"
+                state_def = state_defs.get("HEAT_STRESS_ALERT", {})
+                severity = "HIGH"
 
         # Check if an anomalous state was matched by signals but failed persistence
         persistence_failed_state = None
