@@ -4,7 +4,7 @@ The goal is to build a realistic, data-driven Apiculture monitoring environment.
 
 ## Technical Stack & Visual Aids
 
-**Backend & Agent Framework:** Python 3.12, utilizing an Agent Development Kit (ADK) for structured multi-agent reasoning, and bigframes for data handling.
+**Backend & Agent Framework:** Python 3.12, utilizing an Agent Development Kit (ADK) for structured multi-agent reasoning.
 
 **Context Provisioning:** Model Context Protocol (MCP) Server to dynamically feed telemetry schemas and spatial calculation rules to the agent.
 

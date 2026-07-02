@@ -169,6 +169,6 @@ agents-cli infra cicd
 
 ## Observability
 
-Built-in telemetry exports to **Cloud Trace**, **BigQuery**, and **Cloud Logging** via OpenTelemetry. Set `LOGS_BUCKET_NAME` to enable GCS artifact storage for ADK traces.
+Built-in telemetry exports to **Cloud Trace** and **Cloud Logging** via OpenTelemetry. Set `LOGS_BUCKET_NAME` to enable GCS artifact storage for ADK traces.
 
 > 💡 Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development — project context is pre-configured in `GEMINI.md`.
