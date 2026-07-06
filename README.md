@@ -2,6 +2,8 @@
 
 > AI-powered hive monitoring system for commercial apiaries — built with Google ADK and Streamlit.
 
+**⚠️ Note: This repository is a research and demonstration implementation.**
+
 Apiculture Sentinel continuously evaluates acoustic, environmental, and weight telemetry from IoT-connected beehives to detect anomalies, publish alerts, and surface actionable triage decisions through an interactive Fleet Command dashboard.
 
 ---
