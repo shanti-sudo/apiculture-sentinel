@@ -127,6 +127,12 @@ agents-cli playground
 
 ---
 
+## Security Features
+
+- **Code Pydantic Validation**: Strict type checking and data validation using Pydantic models for all API endpoints, telemetry ingestion, and agent interactions, preventing malformed data and injection vulnerabilities.
+
+---
+
 ## Detected Hive States
 
 | State | Severity | Description |

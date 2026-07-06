@@ -513,4 +513,8 @@ To resolve Cloud Run deployment blockers and simplify the cloud topology, the sy
 5. **Sentinel Memory Past Comparison:**
    - Integrated a historical audit comparison inside the **Learn More** expander panel.
    - It queries `SentinelMemory` to fetch the previous state observation and logs its synthetic explanation, allowing the user to track exactly when and why the state changed across multiple runs.
+
+## 13. Security Features
+
+- **Code Pydantic Validation**: The system leverages strong data validation and strict type checking via Pydantic models. This ensures that all incoming API payloads, telemetry events, and agent-tool interactions are rigorously verified against predefined schemas, preventing injection vulnerabilities and malformed data execution.
 
